@@ -9,6 +9,7 @@
 #import "AppDelegate.h"
 #import <GCDWebServer/GCDWebServer.h>
 #import <GCDWebServer/GCDWebServerDataResponse.h>
+#import "DataConversion.h"
 @import CoreTelephony;
 
 extern NSString* kCTSimSupportUICCAuthenticationTypeKey;
@@ -19,6 +20,7 @@ extern NSString* kCTSimSupportUICCAuthenticationCkKey;
 extern NSString* kCTSimSupportUICCAuthenticationIkKey;
 extern NSString* kCTSimSupportUICCAuthenticationKcKey;
 extern NSString* kCTSimSupportUICCAuthenticationResKey;
+extern NSString* kCTSimSupportUICCAuthenticationAutsKey;
 
 @interface CTSubscriberAuthDataHolder: NSObject
 - (instancetype)initWithData:(NSDictionary<NSString*, id>*)data;
@@ -37,6 +39,8 @@ extern NSString* kCTSimSupportUICCAuthenticationResKey;
 - (NSString*)copyMobileSubscriberIdentity:(CTXPCServiceSubscriptionContext*)subscriptionContext error:(NSError**)error;
 - (void)generateAuthenticationInfoUsingSim:(CTXPCServiceSubscriptionContext*)subscriptionContext authParams:(CTSubscriberAuthDataHolder*)authParams completion:(void (^)(CTSubscriberAuthDataHolder *authInfo, NSError *error))completion;
 @end
+
+static NSString* GetImsi(void);
 
 static void CreateAuthResponse(NSData* randData, NSData* autnData, void (^completion)(NSDictionary<NSString*, id>* response, NSError* error)) {
     // https://github.com/apple-oss-distributions/eap8021x/blob/4dee95a5037b6330a6539cc53a79f176fc084b26/EAP8021X.fproj/SIMAccess.m#L387
@@ -57,39 +61,92 @@ static void CreateAuthResponse(NSData* randData, NSData* autnData, void (^comple
     [coreTelephonyclient generateAuthenticationInfoUsingSim:preferredSubscriptionCtx
                                                  authParams:authInputParams completion:^(CTSubscriberAuthDataHolder *authInfo, NSError *error) {
         (void)coreTelephonyclient;
-        NSLog(@"authInfo: %@ error: %@", authInfo.dict, error);
-        completion(nil, error);
+        NSDictionary<NSString*, id>* authDict = authInfo.dict;
+        NSLog(@"authInfo: %@ error: %@", authDict, error);
+        if (error) {
+            completion(nil, error);
+            return;
+        }
+        NSDictionary<NSString*, NSString*>* outputDict = nil;
+        if (authDict[kCTSimSupportUICCAuthenticationAutsKey]) {
+            outputDict = @{
+                @"auts": [(NSData*)authDict[kCTSimSupportUICCAuthenticationAutsKey] toHexString],
+            };
+        } else if (authDict[kCTSimSupportUICCAuthenticationAutsKey]) {
+            outputDict = @{
+                @"ik": [(NSData*)authDict[kCTSimSupportUICCAuthenticationIkKey] toHexString],
+                @"ck": [(NSData*)authDict[kCTSimSupportUICCAuthenticationCkKey] toHexString],
+                @"res": [(NSData*)authDict[kCTSimSupportUICCAuthenticationResKey] toHexString],
+            };
+        } else {
+            outputDict = @{
+                @"err": @"empty response?",
+            };
+        }
+        completion(outputDict, nil);
     }];
 }
 
-static void StartServer(void) {
+static void StartServer(int port) {
     static GCDWebServer* webServer;
     webServer = [GCDWebServer new];
     [webServer addDefaultHandlerForMethod:@"GET" requestClass:[GCDWebServerRequest class] asyncProcessBlock:^(GCDWebServerRequest* request, GCDWebServerCompletionBlock completionBlock) {
-        NSDictionary<NSString*, id>* responseDict = nil;
-        responseDict = @{
-            @"err": @"invalid command",
-        };
-        completionBlock([GCDWebServerDataResponse responseWithJSONObject:responseDict]);
+        NSString* method = request.query[@"type"];
+        if ([method isEqualToString:@"imsi"]) {
+            completionBlock([GCDWebServerDataResponse responseWithJSONObject:@{
+                @"imsi": GetImsi(),
+            }]);
+        } else if ([method isEqualToString:@"rand-autn"]) {
+            NSData* randData = [request.query[@"rand"] hexStringToData];
+            NSData* autnData = [request.query[@"autn"] hexStringToData];
+            if (!randData || !autnData) {
+                completionBlock([GCDWebServerDataResponse responseWithJSONObject:@{
+                    @"err": @"missing params",
+                }]);
+                return;
+            }
+            CreateAuthResponse(randData, autnData, ^(NSDictionary<NSString *,id> *response, NSError *error) {
+                if (error) {
+                    NSLog(@"Error: %@", error);
+                    completionBlock([GCDWebServerDataResponse responseWithJSONObject:@{
+                        @"err": @"fail",
+                    }]);
+                    return;
+                }
+                completionBlock([GCDWebServerDataResponse responseWithJSONObject:response]);
+            });
+        } else {
+            completionBlock([GCDWebServerDataResponse responseWithJSONObject:@{
+                @"err": @"invalid command",
+            }]);
+        }
     }];
+    [webServer startWithPort:port bonjourName:nil];
 }
 
-static void PrintImsi(void) {
+static NSString* GetImsi(void) {
     NSError* error = nil;
     CoreTelephonyClient *coreTelephonyclient = [CoreTelephonyClient new];
     
     CTXPCServiceSubscriptionInfo* subscriptionInfo = [coreTelephonyclient getSubscriptionInfoWithError:&error];
     if (error) {
         NSLog(@"%@", error);
-        return;
+        return nil;
     }
     CTXPCServiceSubscriptionContext* preferredSubscriptionCtx = subscriptionInfo.subscriptions[0];
     NSString* imsi = [coreTelephonyclient copyMobileSubscriberIdentity:preferredSubscriptionCtx error:&error];
     if (error) {
         NSLog(@"%@", error);
-        return;
+        return nil;
     }
-    printf("%s\n", imsi.UTF8String);
+    return imsi;
+}
+
+static void PrintImsi(void) {
+    NSString* imsi = GetImsi();
+    if (imsi) {
+        printf("%s", imsi.UTF8String);
+    }
 }
 
 static void PerformAuthBase64(char* base64String) {
@@ -124,7 +181,7 @@ int main(int argc, char** argv) {
     } else if (!strcmp(argv[1], "auth")) {
         PerformAuthBase64(argv[2]);
     } else if (!strcmp(argv[1], "serve")) {
-        StartServer();
+        StartServer(argc == 3? atoi(argv[2]): 3333);
     } else {
         fprintf(stderr, "wrong arg\n");
         return 1;

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		75DD0323661691A2B70891CA /* libPods-SimServeriOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A9B7BA8E2CAACBCF46A5B310 /* libPods-SimServeriOS.a */; };
+		C5AB33142873DE5900A6640B /* DataConversion.m in Sources */ = {isa = PBXBuildFile; fileRef = C5AB33122873DE5800A6640B /* DataConversion.m */; };
 		C5F80BC0287286FB00795B28 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = C5F80BBF287286FB00795B28 /* AppDelegate.m */; };
 		C5F80BC3287286FB00795B28 /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = C5F80BC2287286FB00795B28 /* SceneDelegate.m */; };
 		C5F80BC6287286FB00795B28 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = C5F80BC5287286FB00795B28 /* ViewController.m */; };
@@ -20,6 +21,8 @@
 /* Begin PBXFileReference section */
 		8FB37E5AC21BDCDF5E0590AC /* Pods-SimServeriOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SimServeriOS.debug.xcconfig"; path = "Target Support Files/Pods-SimServeriOS/Pods-SimServeriOS.debug.xcconfig"; sourceTree = "<group>"; };
 		A9B7BA8E2CAACBCF46A5B310 /* libPods-SimServeriOS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SimServeriOS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C5AB33122873DE5800A6640B /* DataConversion.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DataConversion.m; sourceTree = "<group>"; };
+		C5AB33132873DE5800A6640B /* DataConversion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DataConversion.h; sourceTree = "<group>"; };
 		C5F80BBB287286FB00795B28 /* SimServeriOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimServeriOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C5F80BBE287286FB00795B28 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		C5F80BBF287286FB00795B28 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -86,6 +89,8 @@
 		C5F80BBD287286FB00795B28 /* SimServeriOS */ = {
 			isa = PBXGroup;
 			children = (
+				C5AB33132873DE5800A6640B /* DataConversion.h */,
+				C5AB33122873DE5800A6640B /* DataConversion.m */,
 				C5F80BD72872895300795B28 /* SimServeriOS.entitlements */,
 				C5F80BBE287286FB00795B28 /* AppDelegate.h */,
 				C5F80BBF287286FB00795B28 /* AppDelegate.m */,
@@ -199,6 +204,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C5F80BC6287286FB00795B28 /* ViewController.m in Sources */,
+				C5AB33142873DE5900A6640B /* DataConversion.m in Sources */,
 				C5F80BC0287286FB00795B28 /* AppDelegate.m in Sources */,
 				C5F80BD1287286FE00795B28 /* main.m in Sources */,
 				C5F80BC3287286FB00795B28 /* SceneDelegate.m in Sources */,
