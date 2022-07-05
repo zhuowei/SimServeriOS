@@ -11,8 +11,18 @@
 #import <GCDWebServer/GCDWebServerDataResponse.h>
 @import CoreTelephony;
 
+extern NSString* kCTSimSupportUICCAuthenticationTypeKey;
+extern NSString* kCTSimSupportUICCAuthenticationTypeEAPAKA;
+extern NSString* kCTSimSupportUICCAuthenticationAutnKey;
+extern NSString* kCTSimSupportUICCAuthenticationRandKey;
+extern NSString* kCTSimSupportUICCAuthenticationCkKey;
+extern NSString* kCTSimSupportUICCAuthenticationIkKey;
+extern NSString* kCTSimSupportUICCAuthenticationKcKey;
+extern NSString* kCTSimSupportUICCAuthenticationResKey;
+
 @interface CTSubscriberAuthDataHolder: NSObject
 - (instancetype)initWithData:(NSDictionary<NSString*, id>*)data;
+- (NSDictionary<NSString*, id>*)dict;
 @end
 
 @interface CTXPCServiceSubscriptionContext: NSObject
@@ -28,7 +38,7 @@
 - (void)generateAuthenticationInfoUsingSim:(CTXPCServiceSubscriptionContext*)subscriptionContext authParams:(CTSubscriberAuthDataHolder*)authParams completion:(void (^)(CTSubscriberAuthDataHolder *authInfo, NSError *error))completion;
 @end
 
-static void CreateAuthResponse(void (^completion)(NSDictionary<NSString*, id>* response, NSError* error)) {
+static void CreateAuthResponse(NSData* randData, NSData* autnData, void (^completion)(NSDictionary<NSString*, id>* response, NSError* error)) {
     // https://github.com/apple-oss-distributions/eap8021x/blob/4dee95a5037b6330a6539cc53a79f176fc084b26/EAP8021X.fproj/SIMAccess.m#L387
     NSError* error = nil;
     CoreTelephonyClient *coreTelephonyclient = [CoreTelephonyClient new];
@@ -39,11 +49,17 @@ static void CreateAuthResponse(void (^completion)(NSDictionary<NSString*, id>* r
         return;
     }
     CTXPCServiceSubscriptionContext* preferredSubscriptionCtx = subscriptionInfo.subscriptions[0];
-    CTSubscriberAuthDataHolder* authInputParams = [[CTSubscriberAuthDataHolder alloc] initWithData:@{}];
+    CTSubscriberAuthDataHolder* authInputParams = [[CTSubscriberAuthDataHolder alloc] initWithData:@{
+        kCTSimSupportUICCAuthenticationRandKey: randData,
+        kCTSimSupportUICCAuthenticationAutnKey: autnData,
+        kCTSimSupportUICCAuthenticationTypeKey: kCTSimSupportUICCAuthenticationTypeEAPAKA,
+    }];
     [coreTelephonyclient generateAuthenticationInfoUsingSim:preferredSubscriptionCtx
                                                  authParams:authInputParams completion:^(CTSubscriberAuthDataHolder *authInfo, NSError *error) {
+        (void)coreTelephonyclient;
+        NSLog(@"authInfo: %@ error: %@", authInfo.dict, error);
+        completion(nil, error);
     }];
-    completion(nil, [NSError errorWithDomain:@"com.worthdoingbadly.SimServeriOS" code:1234 userInfo:nil]);
 }
 
 static void StartServer(void) {
@@ -77,6 +93,21 @@ static void PrintImsi(void) {
 }
 
 static void PerformAuthBase64(char* base64String) {
+    NSData* randAutnData = [[NSData alloc]initWithBase64EncodedString:[NSString stringWithUTF8String:base64String] options:0];
+    if (!randAutnData) {
+        fprintf(stderr, "fail to decode base64\n");
+        exit(1);
+        return;
+    }
+    if (randAutnData.length < 32) {
+        fprintf(stderr, "wrong length\n");
+        exit(1);
+        return;
+    }
+    CreateAuthResponse([randAutnData subdataWithRange:NSMakeRange(0, 16)], [randAutnData subdataWithRange:NSMakeRange(16, 16)], ^(NSDictionary<NSString *,id> *response, NSError *error) {
+        printf("made it\n");
+        exit(0);
+    });
 }
 
 int main(int argc, char** argv) {
@@ -85,11 +116,11 @@ int main(int argc, char** argv) {
                 "imsi: prints imsi\n"
                 "auth <base64-encoded data>: authenticates with EAP_AKA on ISIM\n"
                 "serve <port>: serves web server\n");
-        PrintImsi();
         return 0;
     }
     if (!strcmp(argv[1], "imsi")) {
         PrintImsi();
+        return 0;
     } else if (!strcmp(argv[1], "auth")) {
         PerformAuthBase64(argv[2]);
     } else if (!strcmp(argv[1], "serve")) {
